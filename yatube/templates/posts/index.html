@@ -2,9 +2,13 @@
 {% block title %}Последние обновления на сайте{% endblock %}
 {% load static %}
 {% block content %}
+{% include 'posts/includes/switcher.html' %}
+{% load cache %}
+{% cache 20 index_page page_obj %}
   {% for post in page_obj %}
     {% include 'posts/includes/post.html' %}
     {% if not forloop.last %}<hr>{% endif %}
   {% endfor %}
+{% endcache%}
   {% include 'posts/includes/paginator.html' %}
 {% endblock %}

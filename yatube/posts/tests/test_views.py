@@ -1,5 +1,6 @@
 from django import forms
 from django.conf import settings
+from django.core.cache import cache
 from django.core.paginator import Page
 from django.test import TestCase, Client
 from django.urls import reverse
@@ -48,6 +49,7 @@ class PostPageTest(TestCase):
         )
 
     def setUp(self):
+        cache.clear()
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
 
@@ -187,6 +189,43 @@ class PaginatorViewsTest(TestCase):
         )
 
 
+class CachePageTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = User.objects.create_user(
+            username='test_page_user',
+        )
+        cls.group = Group.objects.create(
+            title='test_page_group',
+            slug='test_page_slug',
+            description='Test description of test_page_group',
+        )
+        cls.post = Post.objects.create(
+            author=cls.user,
+            text='Text_page',
+            group=cls.group,
+        )
+        cls.reverse_index = reverse('posts:index')
+
+    def setUp(self):
+        self.guest_client = Client()
+        self.authorized_client = Client()
+
+    def test_index_page_have_cache(self):
+        posts = self.authorized_client.get(self.reverse_index).content
+        Post.objects.create(
+            author=self.user,
+            text='Text_page',
+            group=self.group,
+        )
+        old_post = self.authorized_client.get(self.reverse_index).content
+        self.assertEqual(old_post, posts)
+        cache.clear()
+        new_post = self.authorized_client.get(self.reverse_index).content
+        self.assertNotEqual(old_post, new_post)
+
+
 class FollowTests(TestCase):
     @classmethod
     def setUpClass(cls):
@@ -200,6 +239,15 @@ class FollowTests(TestCase):
         cls.post = Post.objects.create(
             author=cls.user_following,
             text='Text_page',
+        )
+        cls.post_other = Post.objects.create(
+            author=cls.user_following,
+            text='Text_page_other',
+        )
+        cls.group = Group.objects.create(
+            title='test_url_group',
+            slug='test_url_slug',
+            description='Test description of test_url_group',
         )
         cls.follow = Follow.objects.create(
             user=cls.user_follower,
@@ -235,17 +283,17 @@ class FollowTests(TestCase):
         self.authorized_client_follower.get(self.reverse_profile_unfollow)
         self.assertEqual(Follow.objects.count(), follower_count - 1)
 
-    # def test_follow_new_post(self):
-    #     ''' Новая запись пользователя появляется в ленте тех,
-    #     кто на него подписан и не появляется в ленте тех,
-    #  кто не подписан. '''
-    #     response_1 = self.authorized_client_follower.get(
-    #         self.reverse_index_follow
-    #     )
-    #     post = response_1.context['page_obj'][0]
-    #     self.assertEqual(post, self.post)
-    #     self.follow.delete()
-    #     response_2 = self.authorized_client_follower.get(
-    #         self.reverse_index_follow
-    #     )
-    #     self.assertEqual(len(response_2.context(['page_obj'])), 0)
+    def test_follow_new_post(self):
+        ''' Новая запись пользователя появляется в ленте тех,
+        кто на него подписан и не появляется в ленте тех,
+        кто не подписан. '''
+        response_1 = self.authorized_client_follower.get(
+            self.reverse_index_follow
+        )
+        post = response_1.context['page_obj'][0]
+        self.assertEqual(post, self.post_other)
+        self.follow.delete()
+        response_2 = self.authorized_client_follower.get(
+            self.reverse_index_follow
+        )
+        self.assertEqual(len(response_2.context['page_obj']), 0)

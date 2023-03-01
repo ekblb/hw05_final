@@ -1,13 +1,13 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
-# from django.views.decorators.cache import cache_page
+from django.views.decorators.cache import cache_page
 
 from .forms import CommentForm, PostForm
 from .models import Comment, Group, Follow, Post, User
 from .utils import paginator
 
 
-# @cache_page(60 * 20)
+@cache_page(20, key_prefix='index_page')
 def index(request):
     posts = Post.objects.select_related('group', 'author')
     page_obj = paginator(posts, request)
@@ -94,7 +94,7 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    posts = Post.objects.filter(author=request.user)
+    posts = Post.objects.filter(author__following__user=request.user)
     page_obj = paginator(posts, request)
     context = {
         'page_obj': page_obj,
@@ -105,8 +105,9 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     following = get_object_or_404(User, username=username)
-    if request.user != following:
-        Follow.objects.get_or_create(user=request.user, author=following)
+    follow = Follow.objects.filter(author=following, user=request.user)
+    if request.user != following and not follow.exists():
+        Follow.objects.create(author=following, user=request.user)
     return redirect('posts:profile', username=username)
 
 

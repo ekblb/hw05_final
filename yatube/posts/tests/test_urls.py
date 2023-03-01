@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from django.core.cache import cache
 from django.test import TestCase, Client
 
 from ..models import Group, Post, User
@@ -49,6 +50,7 @@ class PostURLTest(TestCase):
         }
 
     def setUp(self):
+        cache.clear()
         self.guest_client = Client()
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
@@ -92,6 +94,13 @@ class PostURLTest(TestCase):
         """Ошибка 404 для несуществующей страницы."""
         responce = self.guest_client.get(self.unexisting_page)
         self.assertEqual(responce.status_code, HTTPStatus.NOT_FOUND)
+
+    # def test_403_correct_templates(self):
+    #     """Страница 403 использует соответствующий шаблон."""
+    #     template = 'core/403.html'
+    #     self.assertTemplateUsed(
+    #         self.guest_client.get('???'), template
+    #     )
 
     def test_404_correct_templates(self):
         """Страница 404 использует соответствующий шаблон."""
