@@ -2,7 +2,7 @@ from http import HTTPStatus
 from django.core.cache import cache
 from django.test import TestCase, Client
 
-from ..models import Group, Post, User
+from ..models import Follow, Group, Post, User
 
 
 class PostURLTest(TestCase):
@@ -28,6 +28,10 @@ class PostURLTest(TestCase):
             author=cls.user_other,
             text='Text_url_other',
         )
+        cls.follow = Follow.objects.create(
+            user=cls.user,
+            author=cls.user_other,
+        )
 
         cls.page_post = f'/posts/{cls.post.id}/'
         cls.post_other = f'/posts/{cls.post_other.id}/'
@@ -43,6 +47,7 @@ class PostURLTest(TestCase):
         cls.private_pages_template = {
             f'{cls.page_post}edit/': 'posts/create_post.html',
             '/create/': 'posts/create_post.html',
+            '/follow/': 'posts/follow.html',
         }
         cls.pages_template = {
             **cls.public_pages_template,
@@ -94,13 +99,6 @@ class PostURLTest(TestCase):
         """Ошибка 404 для несуществующей страницы."""
         responce = self.guest_client.get(self.unexisting_page)
         self.assertEqual(responce.status_code, HTTPStatus.NOT_FOUND)
-
-    # def test_403_correct_templates(self):
-    #     """Страница 403 использует соответствующий шаблон."""
-    #     template = 'core/403.html'
-    #     self.assertTemplateUsed(
-    #         self.guest_client.get('???'), template
-    #     )
 
     def test_404_correct_templates(self):
         """Страница 404 использует соответствующий шаблон."""

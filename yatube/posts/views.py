@@ -29,7 +29,15 @@ def profile(request, username):
     author = User.objects.get(username=username)
     author_posts = author.posts.select_related('group', 'author')
     page_obj = paginator(author_posts, request)
-    following = True
+    following = get_object_or_404(User, username=username)
+    if request.user.is_authenticated:
+        follow = Follow.objects.filter(author=following, user=request.user)
+        if request.user != author and follow.exists():
+            following = True
+        else:
+            following = False
+    else:
+        following = False
     context = {
         'author': author,
         'page_obj': page_obj,
@@ -42,8 +50,8 @@ def post_detail(request, post_id):
     post = get_object_or_404(
         Post.objects.select_related('group', 'author'), id=post_id
     )
-    form = CommentForm(request.POST or None)
-    comment_post = Comment.objects.select_related('post', 'author')
+    form = CommentForm()
+    comment_post = Comment.objects.select_related('author')
     context = {
         'post': post,
         'form': form,
@@ -54,7 +62,7 @@ def post_detail(request, post_id):
 
 @login_required
 def post_create(request):
-    form = PostForm(request.POST or None)
+    form = PostForm(request.POST or None, files=request.FILES or None)
     if form.is_valid():
         post = form.save(commit=False)
         post.author = request.user
@@ -105,9 +113,8 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     following = get_object_or_404(User, username=username)
-    follow = Follow.objects.filter(author=following, user=request.user)
-    if request.user != following and not follow.exists():
-        Follow.objects.create(author=following, user=request.user)
+    if request.user != following:
+        Follow.objects.get_or_create(author=following, user=request.user)
     return redirect('posts:profile', username=username)
 
 

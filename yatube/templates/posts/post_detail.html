@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 {% load thumbnail %}
-{% block title %} {{ post.text.title|truncatechars:30 }}
-{% endblock %}
+{% block title %} {{ post.text|truncatechars:30 }} {% endblock %}
 {% block content %}
   <div class="row">
     <aside class="col-12 col-md-3">

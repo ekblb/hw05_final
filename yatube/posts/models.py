@@ -52,12 +52,13 @@ class Comment(models.Model):
         null=True,
         related_name='comments',
         on_delete=models.CASCADE,
-        verbose_name='Комментарий',
+        verbose_name='Пост',
     )
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='comments',
+        verbose_name='Автор'
     )
     text = models.TextField(verbose_name='Текст')
     created = models.DateTimeField(
@@ -77,3 +78,11 @@ class Follow(models.Model):
         related_name='following',
         on_delete=models.CASCADE,
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'author'],
+                                    name='user_author_unique_relationships'),
+            models.CheckConstraint(check=~models.Q(user=models.F('author')),
+                                   name='user_author_prevent_self_follow')
+        ]

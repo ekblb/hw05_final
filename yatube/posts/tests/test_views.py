@@ -1,18 +1,38 @@
 from django import forms
 from django.conf import settings
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
+import tempfile
+import shutil
+
 from django.core.paginator import Page
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 
-from ..forms import PostForm
-from ..models import Group, Follow, Post, User
+from ..forms import PostForm, CommentForm
+from ..models import Comment, Group, Follow, Post, User
+
+TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
 
+@override_settings(MEDIA_ROOT=TEMP_MEDIA_ROOT)
 class PostPageTest(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        test_gif = (
+            b'\x47\x49\x46\x38\x39\x61\x02\x00'
+            b'\x01\x00\x80\x00\x00\x00\x00\x00'
+            b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+            b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+            b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+            b'\x0A\x00\x3B'
+        )
+        image_test = SimpleUploadedFile(
+            name='test_image.gif',
+            content=test_gif,
+            content_type='image_test/gif',
+        )
         cls.user = User.objects.create_user(
             username='test_page_user',
         )
@@ -23,11 +43,18 @@ class PostPageTest(TestCase):
         )
         cls.other_group = Group.objects.create(
             title='text_group_title',
-            slug='test_group_slug')
+            slug='test_group_slug'
+        )
         cls.post = Post.objects.create(
             author=cls.user,
             text='Text_page',
             group=cls.group,
+            image=image_test,
+        )
+        cls.comment = Comment.objects.create(
+            post=cls.post,
+            author=cls.user,
+            text='Test_comment',
         )
 
         cls.reverse_index = reverse('posts:index')
@@ -47,6 +74,11 @@ class PostPageTest(TestCase):
         cls.reverse_post_edit = reverse(
             'posts:post_edit', kwargs={'post_id': f'{cls.post.pk}'}
         )
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self):
         cache.clear()
@@ -80,6 +112,7 @@ class PostPageTest(TestCase):
         self.assertEqual(post.text, self.post.text)
         self.assertEqual(post.author, self.post.author)
         self.assertEqual(post.pub_date, self.post.pub_date)
+        self.assertEqual(post.image, self.post.image)
 
     def test_index_page_show_correct_context(self):
         """Шаблон index сформирован с правильным контекстом."""
@@ -103,16 +136,29 @@ class PostPageTest(TestCase):
         self.for_pages(context)
         self.assertEqual(post_author, self.user)
 
+    def for_create_comment_correct_context(self, response):
+        form_fields = {
+            'text': forms.fields.CharField,
+        }
+        form_field = response.context.get('form')
+        self.assertIsInstance(form_field, CommentForm)
+        for value, expected in form_fields.items():
+            with self.subTest(value=value):
+                form_field = response.context.get('form').fields.get(value)
+                self.assertIsInstance(form_field, expected)
+
     def test_post_detail_page_show_correct_context(self):
         """Шаблон post_detail сформирован с правильным контекстом."""
         response = self.authorized_client.get(self.reverse_post_detail)
         context = response.context
         self.for_pages(context, is_page=False)
+        self.for_create_comment_correct_context(response)
 
     def for_create_edit_pages(self, response):
         form_fields = {
             'text': forms.fields.CharField,
-            'group': forms.fields.ChoiceField
+            'group': forms.fields.ChoiceField,
+            'image': forms.fields.ImageField,
         }
         form_field = response.context.get('form')
         self.assertIsInstance(form_field, PostForm)
@@ -132,7 +178,7 @@ class PostPageTest(TestCase):
         self.for_create_edit_pages(response)
 
     def test_post_added_correctly_user2(self):
-        """Пост при создании не добавляется в другую группу"""
+        """Пост при создании не добавляется в другую группу."""
         response = self.authorized_client.get(self.reverse_group_other)
         context = response.context['page_obj']
         self.assertNotIn(self.post, context)
@@ -170,7 +216,7 @@ class PaginatorViewsTest(TestCase):
         Post.objects.bulk_create(bilk_post)
 
     def test_paginator_for_first_second_page(self):
-        '''Проверка количества постов на первой и второй страницах. '''
+        '''Проверка количества постов на первой и второй страницах.'''
         pages: list = [
             self.reverse_index,
             self.reverse_profile,
@@ -213,17 +259,20 @@ class CachePageTests(TestCase):
         self.authorized_client = Client()
 
     def test_index_page_have_cache(self):
-        posts = self.authorized_client.get(self.reverse_index).content
+        '''Проверка работы кеша на главной странице.'''
+        posts_before = self.authorized_client.get(self.reverse_index).content
         Post.objects.create(
             author=self.user,
             text='Text_page',
             group=self.group,
         )
-        old_post = self.authorized_client.get(self.reverse_index).content
-        self.assertEqual(old_post, posts)
+        posts_with_new_post = self.authorized_client.get(
+            self.reverse_index).content
+        self.assertEqual(posts_with_new_post, posts_before)
         cache.clear()
-        new_post = self.authorized_client.get(self.reverse_index).content
-        self.assertNotEqual(old_post, new_post)
+        posts_clear_cache = self.authorized_client.get(
+            self.reverse_index).content
+        self.assertNotEqual(posts_with_new_post, posts_clear_cache)
 
 
 class FollowTests(TestCase):
@@ -272,28 +321,47 @@ class FollowTests(TestCase):
 
     def test_follow_authorized_client(self):
         '''Авторизованный пользователь может подписываться
-        на других пользователей'''
-        follower_count = Follow.objects.count()
-        self.authorized_client_follower.get(self.reverse_profile_follow)
-        self.assertEqual(Follow.objects.count(), follower_count)
+        на других пользователей.'''
+        Follow.objects.all().delete()
+        self.authorized_client_follower.get(
+            self.reverse_profile_follow
+        )
+        self.assertTrue(Follow.objects.filter(
+            author=self.user_following,
+            user=self.user_follower,
+        ).exists())
 
     def test_delete_follow_authorized_client(self):
-        '''Авторизованный пользователь может удалять подписки '''
-        follower_count = Follow.objects.count()
+        '''Авторизованный пользователь может удалять подписки.'''
         self.authorized_client_follower.get(self.reverse_profile_unfollow)
-        self.assertEqual(Follow.objects.count(), follower_count - 1)
+        self.assertFalse(Follow.objects.filter(
+            author=self.user_following,
+            user=self.user_follower,
+        ).exists())
 
     def test_follow_new_post(self):
-        ''' Новая запись пользователя появляется в ленте тех,
-        кто на него подписан и не появляется в ленте тех,
-        кто не подписан. '''
-        response_1 = self.authorized_client_follower.get(
+        '''Пост появляется на странице избранного у подписчика.'''
+        Follow.objects.create(
+            user=self.user_follower,
+            author=self.user_following,
+        )
+        new_post = Post.objects.create(
+            author=self.user_following,
+            text='Text_new_post',
+        )
+        response = self.authorized_client_follower.get(
             self.reverse_index_follow
         )
-        post = response_1.context['page_obj'][0]
-        self.assertEqual(post, self.post_other)
-        self.follow.delete()
-        response_2 = self.authorized_client_follower.get(
+        self.assertIn(new_post, response.context['page_obj'])
+
+    def test_follow_new_post(self):
+        '''Пост не попадает в подписку к пользователям,
+        не подписанным на автора.'''
+        new_post_other = Post.objects.create(
+            author=self.user_following,
+            text='Text_new_post',
+        )
+        response = self.authorized_client_following.get(
             self.reverse_index_follow
         )
-        self.assertEqual(len(response_2.context['page_obj']), 0)
+        self.assertNotIn(new_post_other, response.context['page_obj'])
