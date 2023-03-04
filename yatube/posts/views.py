@@ -11,7 +11,12 @@ from .utils import paginator
 def index(request):
     posts = Post.objects.select_related('group', 'author')
     page_obj = paginator(posts, request)
-    return render(request, 'posts/index.html', {'page_obj': page_obj})
+    index = True
+    context = {
+        'page': index,
+        'page_obj': page_obj,
+    }
+    return render(request, 'posts/index.html', context)
 
 
 def group_posts(request, slug):
@@ -104,8 +109,10 @@ def add_comment(request, post_id):
 def follow_index(request):
     posts = Post.objects.filter(author__following__user=request.user)
     page_obj = paginator(posts, request)
+    follow = True
     context = {
         'page_obj': page_obj,
+        'page': follow,
     }
     return render(request, 'posts/follow.html', context)
 

@@ -1,9 +1,10 @@
+import tempfile
+import shutil
+
 from django import forms
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-import tempfile
-import shutil
 
 from django.core.paginator import Page
 from django.test import TestCase, Client, override_settings
@@ -136,23 +137,24 @@ class PostPageTest(TestCase):
         self.for_pages(context)
         self.assertEqual(post_author, self.user)
 
-    def for_create_comment_correct_context(self, response):
+    def for_create_comment_correct_context(self, context):
         form_fields = {
             'text': forms.fields.CharField,
         }
-        form_field = response.context.get('form')
-        self.assertIsInstance(form_field, CommentForm)
-        for value, expected in form_fields.items():
-            with self.subTest(value=value):
-                form_field = response.context.get('form').fields.get(value)
-                self.assertIsInstance(form_field, expected)
+        form = context.get('form')
+        comment_post = context.get('comment_post')[0]
+        form_field = form.fields.get('text')
+        self.assertIsInstance(form, CommentForm)
+        self.assertIsInstance(form_field, form_fields['text'])
+        self.assertIsInstance(comment_post, Comment)
+        self.assertEqual(comment_post.text, self.comment.text)
 
     def test_post_detail_page_show_correct_context(self):
         """Шаблон post_detail сформирован с правильным контекстом."""
         response = self.authorized_client.get(self.reverse_post_detail)
         context = response.context
         self.for_pages(context, is_page=False)
-        self.for_create_comment_correct_context(response)
+        self.for_create_comment_correct_context(context)
 
     def for_create_edit_pages(self, response):
         form_fields = {
@@ -160,11 +162,11 @@ class PostPageTest(TestCase):
             'group': forms.fields.ChoiceField,
             'image': forms.fields.ImageField,
         }
-        form_field = response.context.get('form')
-        self.assertIsInstance(form_field, PostForm)
+        form = response.context.get('form')
+        self.assertIsInstance(form, PostForm)
         for value, expected in form_fields.items():
             with self.subTest(value=value):
-                form_field = response.context.get('form').fields.get(value)
+                form_field = form.fields.get(value)
                 self.assertIsInstance(form_field, expected)
 
     def test_post_create_page_show_correct_context(self):
@@ -260,19 +262,19 @@ class CachePageTests(TestCase):
 
     def test_index_page_have_cache(self):
         '''Проверка работы кеша на главной странице.'''
-        posts_before = self.authorized_client.get(self.reverse_index).content
+        content_before = self.authorized_client.get(self.reverse_index).content
         Post.objects.create(
             author=self.user,
             text='Text_page',
             group=self.group,
         )
-        posts_with_new_post = self.authorized_client.get(
+        content_with_new_post = self.authorized_client.get(
             self.reverse_index).content
-        self.assertEqual(posts_with_new_post, posts_before)
+        self.assertEqual(content_with_new_post, content_before)
         cache.clear()
-        posts_clear_cache = self.authorized_client.get(
+        content_clear_cache = self.authorized_client.get(
             self.reverse_index).content
-        self.assertNotEqual(posts_with_new_post, posts_clear_cache)
+        self.assertNotEqual(content_with_new_post, content_clear_cache)
 
 
 class FollowTests(TestCase):

@@ -3,7 +3,7 @@
 {% load static %}
 {% block content %}
   <h1> Страница подписок </h1>
-    {% include 'posts/includes/switcher.html' %}
+    {% include 'posts/includes/switcher.html' with page=True %}
       {% for post in page_obj %}
         {% include 'posts/includes/post.html' %}
         {% if not forloop.last %}<hr>{% endif %}

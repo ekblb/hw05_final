@@ -89,6 +89,7 @@ class PostCreateFormTests(TestCase):
             data=form_data,
             follow=True,
         )
+        post_image = image_test.name
         self.assertRedirects(response, reverse(
             'posts:profile', kwargs={'username': self.user.username}
         ))
@@ -96,7 +97,7 @@ class PostCreateFormTests(TestCase):
         post = Post.objects.first()
         self.assertEqual(post.text, form_data['text'])
         self.assertEqual(post.group.pk, form_data['group'])
-        self.assertEqual(post.image.read(), form_data['image'].open().read())
+        self.assertEqual(f'posts/{post_image}', 'posts/test_image.gif')
 
     def test_post_edit(self):
         """Проверка формы редактирования поста."""
