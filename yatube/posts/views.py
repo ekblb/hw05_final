@@ -11,9 +11,7 @@ from .utils import paginator
 def index(request):
     posts = Post.objects.select_related('group', 'author')
     page_obj = paginator(posts, request)
-    index = True
     context = {
-        'page': index,
         'page_obj': page_obj,
     }
     return render(request, 'posts/index.html', context)
@@ -31,18 +29,14 @@ def group_posts(request, slug):
 
 
 def profile(request, username):
-    author = User.objects.get(username=username)
+    author = get_object_or_404(User, username=username)
     author_posts = author.posts.select_related('group', 'author')
     page_obj = paginator(author_posts, request)
-    following = get_object_or_404(User, username=username)
-    if request.user.is_authenticated:
-        follow = Follow.objects.filter(author=following, user=request.user)
-        if request.user != author and follow.exists():
-            following = True
-        else:
-            following = False
-    else:
-        following = False
+    following = (
+        request.user.is_authenticated
+        and author != request.user
+        and Follow.objects.filter(author=author, user=request.user).exists()
+    )
     context = {
         'author': author,
         'page_obj': page_obj,
@@ -109,10 +103,8 @@ def add_comment(request, post_id):
 def follow_index(request):
     posts = Post.objects.filter(author__following__user=request.user)
     page_obj = paginator(posts, request)
-    follow = True
     context = {
         'page_obj': page_obj,
-        'page': follow,
     }
     return render(request, 'posts/follow.html', context)
 

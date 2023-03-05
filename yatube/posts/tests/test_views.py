@@ -5,7 +5,6 @@ from django import forms
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-
 from django.core.paginator import Page
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
@@ -142,9 +141,11 @@ class PostPageTest(TestCase):
             'text': forms.fields.CharField,
         }
         form = context.get('form')
-        comment_post = context.get('comment_post')[0]
-        form_field = form.fields.get('text')
+        comment_post = context.get('comment_post')
+        self.assertTrue(comment_post)
+        comment_post = comment_post[0]
         self.assertIsInstance(form, CommentForm)
+        form_field = form.fields.get('text')
         self.assertIsInstance(form_field, form_fields['text'])
         self.assertIsInstance(comment_post, Comment)
         self.assertEqual(comment_post.text, self.comment.text)
@@ -248,11 +249,6 @@ class CachePageTests(TestCase):
             title='test_page_group',
             slug='test_page_slug',
             description='Test description of test_page_group',
-        )
-        cls.post = Post.objects.create(
-            author=cls.user,
-            text='Text_page',
-            group=cls.group,
         )
         cls.reverse_index = reverse('posts:index')
 

@@ -7,7 +7,7 @@ def page_not_found(request, exception):
 
 def page_403(request, exception):
     return render(
-        request, 'core/403csrf.html', {'path': request.path}, status=403
+        request, 'core/403.html', {'path': request.path}, status=403
     )
 
 
