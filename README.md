@@ -1,3 +1,41 @@
-# hw05_final
+# Yatube
 
-[![CI](https://github.com/yandex-praktikum/hw05_final/actions/workflows/python-app.yml/badge.svg?branch=master)](https://github.com/yandex-praktikum/hw05_final/actions/workflows/python-app.yml)
+Этот проект даёт возможность создавать страницы с публикациями личных дневников. Незарегистрированные пользователи могут заходить на чужие страницы, просматривать записи авторов. Реализована система регистрации и восстановления пароля. При регистрации автор может выбрать имя и уникальный адрес своей страницы. Зарегистрированные пользователи могут просматривать чужие записи, комментировать их, подписываться на понравившихся авторов, отписываться от авторов.
+
+
+## Используемые технологии
+
+- python 3.9.6;
+
+
+## Для запуска проекта
+
+- склонировать репозиторий:
+
+```bash
+git clone git@github.com:ekblb/homework_bot.git
+```
+
+- установить и активировать виртуальное окружение:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+- установить зависимости:
+```bash
+pip install -r requirements.txt
+```
+
+- применить миграции:
+```bash
+python manage.py migrate
+```
+
+- применить команду запуска на локальном сервере:
+```bash
+python manage.py runserver
+```
+
+Екатерина Балабаева
+balabaeva.e.yu@yandex.ru
