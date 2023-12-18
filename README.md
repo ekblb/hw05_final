@@ -37,5 +37,8 @@ python manage.py migrate
 python manage.py runserver
 ```
 
+
+## Автор
+
 Екатерина Балабаева
 balabaeva.e.yu@yandex.ru
